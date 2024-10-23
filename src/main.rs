@@ -25,7 +25,7 @@ struct Candle {
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1960.0, 1800.0]), // 사이드바를 고려하여 크기를 조정합니다.
+        viewport: egui::ViewportBuilder::default().with_inner_size([980.0, 900.0]), // 사이드바를 고려하여 크기를 조정합니다.
         ..Default::default()
     };
     eframe::run_native(
@@ -87,6 +87,39 @@ impl Default for StockChart {
 }
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        println!("이거");
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            // The top panel is often a good place for a menu bar:
+
+            egui::menu::bar(ui, |ui| {
+                // NOTE: no File->Quit on web pages!
+                let is_web = cfg!(target_arch = "wasm32");
+                if !is_web {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Quit").clicked() {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                    });
+                    ui.add_space(16.0);
+                }
+
+                egui::widgets::global_dark_light_mode_buttons(ui);
+            });
+        });
+        egui::Window::new("Stock Picker").show(ctx, |ui| {
+            println!("{}","힝");
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().text_edit_width = 50.;
+                ui.label("Stock:");
+                // ui.text_edit_singleline(&mut self.stock);
+            });
+            ui.horizontal(|ui| {
+                if ui.button("PICK").clicked() {
+                    // self.stocks_map.lock().unwrap().insert(self.stock.clone(), 
+                    //     Arc::new(Mutex::new(Stock::default(&self.stock))));
+                }
+            });
+        });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Main Screen");
