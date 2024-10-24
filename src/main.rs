@@ -1,33 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(rustdoc::missing_crate_level_docs)] // it's an example
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use serde::Deserialize;
-use std::fs;
 use yahoo_finance_api as yahoo;
+
+// use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use rayon::prelude::*; // rayon을 가져옵니다.
-
-use yahoo_finance_api::time::{macros::datetime, OffsetDateTime};
-use yahoo_finance_api::Quote;
-
+use yahoo_finance_api::time::{macros::datetime};
 use eframe::egui::{self, Color32, Stroke};
-use std::net::UdpSocket; // `egui_plot` crate를 import
 use tokio_test;
 use egui_plot::Bar;
 //lib
 use stocki::plot::candle;
-// #[derive(Deserialize, Debug)]
-// struct Candle {
-//     #[serde(rename = "candle_date_time_utc")]
-//     candle_date_time_utc: String,
-//     #[serde(rename = "opening_price")]
-//     opening_price: f64,
-//     #[serde(rename = "high_price")]
-//     high_price: f64,
-//     #[serde(rename = "low_price")]
-//     low_price: f64,
-//     #[serde(rename = "trade_price")]
-//     trade_price: f64,
-// }
 fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
@@ -49,8 +31,6 @@ fn main() -> eframe::Result {
 struct MyApp {
     name: String,
     age: u32,
-    socket: UdpSocket,
-    destination: String,
     current_screen: Screen,
     files: Vec<String>,
     button_text: String,       // 초기 텍스트
@@ -61,8 +41,7 @@ pub  fn fetch_quotes() -> Vec<Bar> {
     let provider = yahoo::YahooConnector::new().unwrap();
     let start = datetime!(2023-12-20 0:00:00.00 UTC);
     let end = datetime!(2024-1-1 23:59:59.99 UTC);
-
-    let resp = tokio_test::block_on(provider.get_latest_quotes("AAPL", "1d")).unwrap();
+    let resp = tokio_test::block_on(provider.get_quote_history("AAPL", start, end)).unwrap();
     let quotes = resp.quotes().unwrap();
     let red = Color32::from_rgb(255, 0, 0);
     let green = Color32::from_rgb(0, 255, 0);
@@ -87,30 +66,13 @@ pub  fn fetch_quotes() -> Vec<Bar> {
     }).collect()
 }
 
-//  fn get_data() -> Vec<Quote> {
-//     let provider = yahoo::YahooConnector::new().unwrap();
-//     let start = datetime!(2023-12-20 0:00:00.00 UTC);
-//     let end = datetime!(2024-1-1 23:59:59.99 UTC);
-//     let resp = tokio_test::block_on(provider.get_quote_history("AAPL", start, end)).unwrap();
 
-//     // let resp = provider
-//     //     .get_quote_history("AAPL", start, end)
-//     //     .await
-//     //     .unwrap();
-//     let quotes = resp.quotes().unwrap();
-//     quotes
-// }
 impl Default for MyApp {
     fn default() -> Self {
-        let socket = UdpSocket::bind("127.0.0.1:34254").expect("Couldn't bind to address");
-
         Self {
             name: "Arthur".to_owned(),
             age: 42,
-            socket,
-            destination: "127.0.0.1:8080".to_owned(),
             current_screen: Screen::Main,
-            // stock_chart: StockChart::default(), // StockChart 초기화
             files: Vec::new(),
             button_text: "Stocks".to_string(), // 초기 텍스트
             stocks: vec!["GOOG", "GOOG2"],     // 초기 주식 이름
@@ -119,26 +81,14 @@ impl Default for MyApp {
     }
 }
 
+//사이드 메뉴
 enum Screen {
     Main,
     Secondary,
     Tertiary,
 }
 
-struct StockChart {
-    prices: Vec<f64>,
-}
 
-impl Default for StockChart {
-    fn default() -> Self {
-        // 예시로 랜덤한 주식 가격 데이터를 생성합니다.
-        let prices = (0..100)
-            .map(|i| (i as f64, (i as f64 * 0.1).sin() * 10.0 + 50.0))
-            .map(|(_, y)| y)
-            .collect();
-        Self { prices }
-    }
-}
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         println!("이거");
@@ -175,11 +125,6 @@ impl eframe::App for MyApp {
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
-            // ui.horizontal(|ui| {
-            //     ui.heading("Main Screen");
-            // });
-            // ui.separator();
-
             ui.horizontal(|ui| {
                 // 사이드바를 포함하는 좌측 영역
                 ui.vertical(|ui| {
@@ -214,7 +159,7 @@ impl eframe::App for MyApp {
 
                         if ui.button("Send UDP Message").clicked() {
                             let message = format!("Name: {}, Age: {}", self.name, self.age);
-                            let _ = self.socket.send_to(message.as_bytes(), &self.destination);
+                            // let _ = self.socket.send_to(message.as_bytes(), &self.destination);
                         }
                     }
                     Screen::Secondary => {
