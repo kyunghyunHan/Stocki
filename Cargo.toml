@@ -16,3 +16,6 @@ tokio-test = "0.4.4"
 reqwest = "0.12.8"
 time = "0.3.36"
 rayon = "1.10.0"
+
+[profile.release]
+opt-level = 3 # fast and small wasm
