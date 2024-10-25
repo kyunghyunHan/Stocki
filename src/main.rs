@@ -1,15 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(rustdoc::missing_crate_level_docs)] // it's an example
-use std::{sync::{mpsc::{self, Receiver, Sender},Arc,Mutex},thread,time::{Duration,Instant}};
 use eframe::egui;
-use egui_plot::Bar;
+use egui_plot::{Bar,BoxElem};
+use std::{
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
+    },
+    thread,
+    time::{Duration, Instant},
+};
 //lib
-use stocki::{plot::candle, utils::get_data};
+use stocki::{plot::{plot}, utils::get_data};
 
 fn main() -> eframe::Result {
-    env_logger::init(); 
+    env_logger::init();
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([980.0, 900.0]), 
+        viewport: egui::ViewportBuilder::default().with_inner_size([980.0, 900.0]),
         ..Default::default()
     };
     eframe::run_native(
@@ -26,10 +33,10 @@ fn main() -> eframe::Result {
 
 struct MyApp {
     button_text: Arc<Mutex<String>>, // 선택한 주식 이름을 공유하는 Arc<Mutex>
-    stocks: Vec<&'static str>, // 주식 이름을 저장할 벡터
-    stock_data: Vec<Bar>,      // 주식 데이터
-    last_update: Instant,      // 마지막 업데이트 시간
-    rx: Receiver<Vec<Bar>>,    // 수신자
+    stocks: Vec<&'static str>,       // 주식 이름을 저장할 벡터
+    stock_data: Vec<BoxElem>,            // 주식 데이터
+    last_update: Instant,            // 마지막 업데이트 시간
+    rx: Receiver<Vec<BoxElem>>,          // 수신자
 }
 
 impl Default for MyApp {
@@ -42,7 +49,7 @@ impl Default for MyApp {
             loop {
                 thread::sleep(Duration::from_secs(1)); // 30초 대기
                 let stock_name = selected_stock_clone.lock().unwrap().clone(); // 선택된 주식 이름 가져오기
-                let new_data = get_data(&"AAPL"); // 주식 데이터를 가져옴
+                let new_data = get_data(&stock_name); // 주식 데이터를 가져옴
                 if tx.send(new_data).is_err() {
                     break; // 메인 스레드가 더 이상 데이터를 수신하지 않으면 종료
                 }
@@ -65,7 +72,7 @@ impl eframe::App for MyApp {
             println!("새 데이터 수신");
             self.stock_data = new_data;
             self.last_update = Instant::now(); // 마지막 업데이트 시간 갱신
-            
+
             ctx.request_repaint();
         }
         ctx.request_repaint_after(Duration::from_secs(1));
@@ -104,7 +111,7 @@ impl eframe::App for MyApp {
                     });
                     ui.group(|ui| {
                         ui.label("Candle Chart Section");
-                        candle::candle_chart(ui, &self.stock_data);
+                        plot::bar_chart(ui, &self.stock_data);
                     });
                 });
             });
