@@ -17,27 +17,38 @@ pub fn get_data(stock_name: &str) -> Vec<BoxElem> {
 
     quotes
         .into_par_iter()
-        .map(|quote| {
-            let open = quote.open as f64; // open을 f64로 변환
-            let close = quote.close as f64; // close을 f64로 변환
-            let volume = quote.volume as f64; // volume을 f64로 변환
+        .enumerate() // 인덱스와 요소를 함께 가져옴
+
+        .map(|(index, quote)| {
+            let open = quote.open as f64;
+            let close = quote.close as f64;
+            let volume = quote.volume as f64;
             let color = if close >= open { green } else { red };
             let timestamp = quote.timestamp as f64;
+        
+            /* 컬러 */
+            let red = Color32::from_rgb(255, 0, 0);
+            let green = Color32::from_rgb(0, 255, 0);
+            let blue = Color32::from_rgb(0, 0, 255);
+            /* BoxSpread 정의 */
+            let lower_whisker = quote.low as f64;   // 최저가
+            let upper_whisker = quote.high as f64;  // 최고가
+            let lower_bound = open.min(close);       // 몸체 아래쪽 경계
+            let upper_bound = open.max(close);       // 몸체 위쪽 경계
+            let median = (open + close) / 2.0;       // 중앙값
+            println!("lower_bound{}",lower_bound);
+            println!("lower_whisker{}",lower_whisker);
+            println!("upper_whisker{}",upper_whisker);
+            println!("upper_bound{}",upper_bound);
+            println!("median{}",median);
 
-            // BoxSpread를 정의합니다.
-            let lower_bound = open; // 아래 경계
-            let lower_whisker = open; // 아래 수염
-            let upper_whisker = close; // 위 수염
-            let upper_bound = close; // 위 경계
-            let median = (open + close) / 2.0; // 중앙값
             let spread = BoxSpread::new(
-                lower_bound,
                 lower_whisker,
-                upper_whisker,
-                upper_bound,
+                lower_bound,
                 median,
+                upper_bound,
+                upper_whisker,
             );
-
             // (
             //     // Bar::from(Bar {
             //     //     name: "a".to_string(),
@@ -51,7 +62,12 @@ pub fn get_data(stock_name: &str) -> Vec<BoxElem> {
             //     // }),
             //     // BoxElem::new(timestamp, spread), // argument는 timestamp, spread는 위에서 정의한 값을 사용
             // )
-            BoxElem::new(timestamp, spread).stroke(Stroke::new(1.0, green))
+            let color = if close >= open { blue } else { red }; // 초록색을 파란색으로 변경
+
+            BoxElem::new(index as f64, spread)
+                .whisker_width(0.0) // 수염 숨기기
+                .fill(color)
+                .stroke(Stroke::new(2.0, color)) // 색상 지정
 
             // argument는 timestamp, spread는 위에서 정의한 값을 사용
         })
