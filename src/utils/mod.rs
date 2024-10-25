@@ -4,9 +4,10 @@ use rayon::prelude::*;
 use tokio_test;
 use yahoo_finance_api as yahoo;
 use yahoo_finance_api::time::macros::datetime;
+use crate::types::StockType;
 
-pub fn get_data(stock_name: &str) -> Vec<BoxElem> {
-    println!("{}", stock_name);
+pub fn get_data(stock_name: &str,stock_type:&str) -> Vec<BoxElem> {
+     
     let provider = yahoo::YahooConnector::new().unwrap();
     let start = datetime!(2000-1-1 0:00:00.00 UTC);
     let end = datetime!(2024-12-31 23:59:59.99 UTC);
