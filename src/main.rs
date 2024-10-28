@@ -79,15 +79,22 @@ impl Default for MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        while let Ok(new_data) = self.rx.try_recv() {
-            println!("새 데이터 수신");
+        // while let Ok(new_data) = self.rx.try_recv() {
+        //     println!("새 데이터 수신");
+        //     self.stock_data = new_data;
+        //     self.last_update = Instant::now(); // 마지막 업데이트 시간 갱신
+
+        //     ctx.request_repaint();
+        // }
+        // ctx.request_repaint_after(Duration::from_secs(1));
+        if let Ok(new_data) = self.rx.try_recv() {
             self.stock_data = new_data;
-            self.last_update = Instant::now(); // 마지막 업데이트 시간 갱신
-
-            ctx.request_repaint();
+            self.last_update = Instant::now();
+            ctx.request_repaint(); // 데이터 갱신 시에만 UI를 갱신
+        } else {
+            // 특정 시간 간격마다 자동 UI 리페인트
+            ctx.request_repaint_after(Duration::from_secs(1));
         }
-        ctx.request_repaint_after(Duration::from_secs(1));
-
         // 상단 바
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
