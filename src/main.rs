@@ -4,7 +4,6 @@ use iced::{
         canvas::{Canvas, Program},
         column, text, Column, Container,
     },
-    window::Settings,
     Color, Element, Length,
 };
 
@@ -17,75 +16,65 @@ pub enum Message {
 #[derive(Default)]
 struct Counter {
     value: i32,
-    prices: Vec<f32>, // 주식 가격 데이터
+    candlesticks: Vec<Candlestick>,
+}
+
+#[derive(Debug, Clone)]
+struct Candlestick {
+    open: f32,
+    close: f32,
+    high: f32,
+    low: f32,
 }
 
 impl Counter {
     pub fn view(&self) -> Element<Message> {
         let canvas = Canvas::new(Chart {
-            prices: self.prices.clone(),
+            candlesticks: self.candlesticks.clone(),
         })
         .width(Length::Fill)
-        .height(Length::Fill);
+        .height(Length::from(500)); // 캔버스 높이 지정
 
-        // Container::new(canvas)
-        //     .width(Length::from(110))
-        //     .height(Length::from(110))
-        //     .padding(20)
-        //     .center_x(100)
-        //     .center_y(100)
-        //     .into()
         Column::new()
             .push(button("+").on_press(Message::Increment))
             .push(text(self.value).size(50))
             .push(button("-").on_press(Message::Decrement))
-            .push(
-                Container::new(canvas)
-                    .width(Length::Fill)
-                    // .height(Length::Units(300)),
-            )
+            .push(Container::new(canvas).width(Length::Fill).height(Length::from(500))) // 캔버스 높이 지정
             .into()
-        // Column::new()
-        //     .push(button("+").on_press(Message::Increment))
-        //     .push(text(self.value).size(50))
-        //     .push(button("-").on_press(Message::Decrement))
-        //     .push(
-        //         Canvas::new(Chart {
-        //             prices: self.prices.clone(),
-        //         })
-        //         .width(iced::Length::Fill)
-        //         .height(iced::Length::Fill),
-        //     )
-        //     .into()
-        // column![
-        //     button("+").on_press(Message::Increment),
-        //     text(self.value).size(50),
-        //     button("-").on_press(Message::Decrement),
-        //     // 차트 표시
-        //     Canvas::new(Chart {
-        //         prices: self.prices.clone()
-        //     })
-        //     .width(iced::Length::Fill)
-        //     .height(iced::Length::Fill),
-        // ]
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
             Message::Increment => {
-                self.value += 1;
-                self.prices.push(self.value as f32); // 현재 값을 차트 데이터에 추가
+                let new_value = self.value + 1;
+                self.value = new_value;
+
+                // 새 캔들스틱 추가
+                self.candlesticks.push(Candlestick {
+                    open: new_value as f32,
+                    close: new_value as f32,
+                    high: new_value as f32 + 1.0,
+                    low: new_value as f32 - 1.0,
+                });
             }
             Message::Decrement => {
-                self.value -= 1;
-                self.prices.push(self.value as f32); // 현재 값을 차트 데이터에 추가
+                let new_value = self.value - 1;
+                self.value = new_value;
+
+                // 새 캔들스틱 추가
+                self.candlesticks.push(Candlestick {
+                    open: new_value as f32,
+                    close: new_value as f32,
+                    high: new_value as f32 + 1.0,
+                    low: new_value as f32 - 1.0,
+                });
             }
         }
     }
 }
 
 struct Chart {
-    prices: Vec<f32>,
+    candlesticks: Vec<Candlestick>,
 }
 
 impl<Message> Program<Message> for Chart {
@@ -101,34 +90,53 @@ impl<Message> Program<Message> for Chart {
     ) -> Vec<iced::widget::canvas::Geometry> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
 
-        let path = canvas::Path::new(|builder| {
-            for (i, price) in self.prices.iter().enumerate() {
-                let x = i as f32 * 10.0; // x 좌표
-                let y = bounds.height - price; // y 좌표 (높이에서 가격을 빼서 아래로 그리기)
-                let point: iced::Point = (x, y).into();
-                if i == 0 {
-                    builder.move_to(point);
-                } else {
-                    builder.line_to(point);
-                }
-            }
-        });
+        if self.candlesticks.is_empty() {
+            return vec![frame.into_geometry()]; // 캔들스틱이 없을 경우 빈 프레임 반환
+        }
 
-        frame.stroke(
-            &path,
-            canvas::Stroke {
-                style: canvas::Style::Solid(Color::from_rgb(255.0, 0.0, 0.0)),
-                width: 2.0,
-                line_cap: canvas::LineCap::Butt,
-                line_join: canvas::LineJoin::Miter,
-                line_dash: canvas::LineDash::default(),
-            },
-        );
+        for (i, candlestick) in self.candlesticks.iter().enumerate() {
+            let x = i as f32 * 20.0; // x 좌표 간격
+            let open_y = bounds.height - candlestick.open * 10.0; // 스케일 조정
+            let close_y = bounds.height - candlestick.close * 10.0; // 스케일 조정
+            let high_y = bounds.height - candlestick.high * 10.0; // 스케일 조정
+            let low_y = bounds.height - candlestick.low * 10.0; // 스케일 조정
+
+            // 캔들 몸체 그리기
+            let body_top = close_y.min(open_y);
+            let body_bottom = close_y.max(open_y);
+            let body_color = if candlestick.close >= candlestick.open {
+                Color::from_rgb(0.0, 1.0, 0.0) // 상승은 초록색
+            } else {
+                Color::from_rgb(1.0, 0.0, 0.0) // 하락은 빨간색
+            };
+
+            // 몸체 그리기
+            frame.fill_rectangle(
+                iced::Point::new(x, body_top),
+                iced::Size::new(15.0, body_bottom - body_top),
+                body_color,
+            );
+
+            // 고가와 저가 선 그리기
+            frame.stroke(
+                &canvas::Path::new(|builder| {
+                    builder.move_to(iced::Point::new(x + 7.5, high_y));
+                    builder.line_to(iced::Point::new(x + 7.5, low_y));
+                }),
+                canvas::Stroke {
+                    style: canvas::Style::Solid(Color::from_rgb(0.0, 0.0, 255.0)),
+                    width: 1.0,
+                    line_cap: canvas::LineCap::Round,
+                    line_join: canvas::LineJoin::Round,
+                    line_dash: canvas::LineDash::default(),
+                },
+            );
+        }
 
         vec![frame.into_geometry()]
     }
 }
 
 fn main() -> iced::Result {
-    iced::run("A simple chart", Counter::update, Counter::view)
+    iced::run("A simple candlestick chart", Counter::update, Counter::view)
 }
