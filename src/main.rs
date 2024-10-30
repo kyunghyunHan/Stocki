@@ -1,161 +1,134 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
-#![allow(rustdoc::missing_crate_level_docs)] // it's an example
-use eframe::egui;
-use egui_plot::{Bar,BoxElem};
-use std::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc, Mutex,
+use iced::{
+    widget::{
+        button, canvas,
+        canvas::{Canvas, Program},
+        column, text, Column, Container,
     },
-    thread,
-    time::{Duration, Instant},
+    window::Settings,
+    Color, Element, Length,
 };
-//lib
-use stocki::{plot::{plot}, utils::get_data,types::StockType};
 
-fn main() -> eframe::Result {
-    env_logger::init();
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([980.0, 900.0]),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "My egui App",
-        options,
-        Box::new(|cc| {
-            // This gives us image support:
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-
-            Ok(Box::<MyApp>::default())
-        }),
-    )
+#[derive(Debug, Clone, Copy)]
+pub enum Message {
+    Increment,
+    Decrement,
 }
 
-struct MyApp {
-    button_text: Arc<Mutex<String>>, // 선택한 주식 이름을 공유하는 Arc<Mutex>
-    stocks: Vec<&'static str>,       // 주식 이름을 저장할 벡터
-    stock_types:  Vec<&'static str>,          // 주식 이름을 저장할 벡터
-
-    stock_data: Vec<BoxElem>,            // 주식 데이터
-    last_update: Instant,            // 마지막 업데이트 시간
-    rx: Receiver<Vec<BoxElem>>,          // 수신자
-    stock_type:Arc<Mutex<String>>,
+#[derive(Default)]
+struct Counter {
+    value: i32,
+    prices: Vec<f32>, // 주식 가격 데이터
 }
 
-impl Default for MyApp {
-    fn default() -> Self {
-        let (tx, rx) = mpsc::channel();
-        let selected_type = Arc::new(Mutex::new("day".to_string())); // 초기 주식 이름
+impl Counter {
+    pub fn view(&self) -> Element<Message> {
+        let canvas = Canvas::new(Chart {
+            prices: self.prices.clone(),
+        })
+        .width(Length::Fill)
+        .height(Length::Fill);
 
-        let selected_stock = Arc::new(Mutex::new("AAPL".to_string())); // 초기 주식 이름
+        // Container::new(canvas)
+        //     .width(Length::from(110))
+        //     .height(Length::from(110))
+        //     .padding(20)
+        //     .center_x(100)
+        //     .center_y(100)
+        //     .into()
+        Column::new()
+            .push(button("+").on_press(Message::Increment))
+            .push(text(self.value).size(50))
+            .push(button("-").on_press(Message::Decrement))
+            .push(
+                Container::new(canvas)
+                    .width(Length::Fill)
+                    // .height(Length::Units(300)),
+            )
+            .into()
+        // Column::new()
+        //     .push(button("+").on_press(Message::Increment))
+        //     .push(text(self.value).size(50))
+        //     .push(button("-").on_press(Message::Decrement))
+        //     .push(
+        //         Canvas::new(Chart {
+        //             prices: self.prices.clone(),
+        //         })
+        //         .width(iced::Length::Fill)
+        //         .height(iced::Length::Fill),
+        //     )
+        //     .into()
+        // column![
+        //     button("+").on_press(Message::Increment),
+        //     text(self.value).size(50),
+        //     button("-").on_press(Message::Decrement),
+        //     // 차트 표시
+        //     Canvas::new(Chart {
+        //         prices: self.prices.clone()
+        //     })
+        //     .width(iced::Length::Fill)
+        //     .height(iced::Length::Fill),
+        // ]
+    }
 
-        let selected_stock_clone = Arc::clone(&selected_stock);
-        let selected_type_clone = Arc::clone(&selected_type);
+    pub fn update(&mut self, message: Message) {
+        match message {
+            Message::Increment => {
+                self.value += 1;
+                self.prices.push(self.value as f32); // 현재 값을 차트 데이터에 추가
+            }
+            Message::Decrement => {
+                self.value -= 1;
+                self.prices.push(self.value as f32); // 현재 값을 차트 데이터에 추가
+            }
+        }
+    }
+}
 
-        thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_secs(1)); // 30초 대기
-                let stock_name = selected_stock_clone.lock().unwrap().clone(); // 선택된 주식 이름 가져오기
-                let stock_type = selected_type_clone.lock().unwrap().clone(); // 선택된 주식 이름 가져오기
+struct Chart {
+    prices: Vec<f32>,
+}
 
-                let new_data = get_data(&stock_name,&stock_type); // 주식 데이터를 가져옴
-                if tx.send(new_data).is_err() {
-                    break; // 메인 스레드가 더 이상 데이터를 수신하지 않으면 종료
+impl<Message> Program<Message> for Chart {
+    type State = ();
+
+    fn draw(
+        &self,
+        _state: &(),
+        renderer: &iced::Renderer,
+        _theme: &iced::Theme,
+        bounds: iced::Rectangle,
+        _cursor: iced::mouse::Cursor,
+    ) -> Vec<iced::widget::canvas::Geometry> {
+        let mut frame = canvas::Frame::new(renderer, bounds.size());
+
+        let path = canvas::Path::new(|builder| {
+            for (i, price) in self.prices.iter().enumerate() {
+                let x = i as f32 * 10.0; // x 좌표
+                let y = bounds.height - price; // y 좌표 (높이에서 가격을 빼서 아래로 그리기)
+                let point: iced::Point = (x, y).into();
+                if i == 0 {
+                    builder.move_to(point);
+                } else {
+                    builder.line_to(point);
                 }
             }
         });
 
-        Self {
-            button_text: selected_stock,
-            stocks: vec!["AAPL", "GOOGL"],
-            stock_types: vec!["Day", "YEAR"],
-            stock_data: get_data("AAPL","Day"), // 초기 주식 데이터
-            last_update: Instant::now(),
-            rx,
-            stock_type: selected_type, // 여기에 필드 이름을 추가합니다.
-        }
+        frame.stroke(
+            &path,
+            canvas::Stroke {
+                style: canvas::Style::Solid(Color::from_rgb(255.0, 0.0, 0.0)),
+                width: 2.0,
+                line_cap: canvas::LineCap::Butt,
+                line_join: canvas::LineJoin::Miter,
+                line_dash: canvas::LineDash::default(),
+            },
+        );
+
+        vec![frame.into_geometry()]
     }
 }
 
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // while let Ok(new_data) = self.rx.try_recv() {
-        //     println!("새 데이터 수신");
-        //     self.stock_data = new_data;
-        //     self.last_update = Instant::now(); // 마지막 업데이트 시간 갱신
-
-        //     ctx.request_repaint();
-        // }
-        // ctx.request_repaint_after(Duration::from_secs(1));
-        if let Ok(new_data) = self.rx.try_recv() {
-            self.stock_data = new_data;
-            self.last_update = Instant::now();
-            ctx.request_repaint(); // 데이터 갱신 시에만 UI를 갱신
-        } else {
-            // 특정 시간 간격마다 자동 UI 리페인트
-            ctx.request_repaint_after(Duration::from_secs(1));
-        }
-        // 상단 바
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                let is_web = cfg!(target_arch = "wasm32");
-                if !is_web {
-                    ui.menu_button("File", |ui| {
-                        if ui.button("Quit").clicked() {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-                    });
-                    ui.add_space(16.0);
-                }
-                egui::widgets::global_dark_light_mode_buttons(ui);
-            });
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.group(|ui| {
-                        let button_text = self.button_text.lock().unwrap().clone(); // 공유된 주식 이름 가져오기
-                        let stock_type = self.stock_type.lock().unwrap().clone(); // 공유된 주식 이름 가져오기
-
-                        ui.menu_button(&button_text, |ui| {
-                            for &stock in &self.stocks {
-                                if ui.button(stock).clicked() {
-                                    println!("{} 클릭", stock);
-                                    *self.button_text.lock().unwrap() = stock.to_string(); // 선택된 주식 이름 업데이트
-                                    self.stock_data = get_data(stock,&stock_type); // 클릭 시 즉시 데이터 업데이트
-                                    ui.close_menu(); // 메뉴 닫기
-                                }
-                            }
-                        });
-                    });
-                    ui.group(|ui| {
-                        ui.label("Candle Chart Section");
-                        // plot::bar_chart(ui, &self.stock_data);
-                    });
-                    ui.group(|ui| {
-                        ui.label("Candle Chart Section");
-                        let button_text = self.button_text.lock().unwrap().clone(); // 공유된 주식 이름 가져오기
-                        let stock_type = self.stock_type.lock().unwrap().clone(); // 공유된 주식 이름 가져오기
-                        ui.horizontal(|ui| {
-                           
-                            ui.menu_button(&stock_type, |ui| {
-                                for &stock in &self.stock_types {
-                                    if ui.button(stock).clicked() {
-                                        println!("{} 클릭", stock);
-                                        *self.stock_type.lock().unwrap() = stock.to_string(); // 선택된 주식 이름 업데이트
-                                        self.stock_data = get_data(&button_text,&stock_type); // 클릭 시 즉시 데이터 업데이트
-                                        ui.close_menu(); // 메뉴 닫기
-                                    }
-                                }
-                            });
-
-                        });
-                   
-                        plot::bar_chart(ui, &self.stock_data);
-                    });
-                });
-            });
-        });
-    }
+fn main() -> iced::Result {
+    iced::run("A simple chart", Counter::update, Counter::view)
 }
