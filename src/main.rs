@@ -2,7 +2,7 @@ use iced::{
     widget::{
         button, canvas,
         canvas::{Canvas, Program},
-        column, text, Column, Container,
+        column, container, pick_list, text, Column, Container, PickList,
     },
     Color, Element, Length,
 };
@@ -11,12 +11,20 @@ use iced::{
 pub enum Message {
     Increment,
     Decrement,
+    FruitSelected(Fruit),
 }
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fruit {
+    Apple,
+    Orange,
+    Strawberry,
+    Tomato,
+}
 #[derive(Default)]
 struct Counter {
     value: i32,
     candlesticks: Vec<Candlestick>,
+    selected_option: Option<Fruit>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,7 +34,16 @@ struct Candlestick {
     high: f32,
     low: f32,
 }
-
+impl std::fmt::Display for Fruit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Apple => "Apple",
+            Self::Orange => "Orange",
+            Self::Strawberry => "Strawberry",
+            Self::Tomato => "Tomato",
+        })
+    }
+}
 impl Counter {
     pub fn view(&self) -> Element<Message> {
         let canvas = Canvas::new(Chart {
@@ -34,12 +51,29 @@ impl Counter {
         })
         .width(Length::Fill)
         .height(Length::from(500)); // 캔버스 높이 지정
-
+        let dropdown_options = vec!["Option 1", "Option 2", "Option 3"];
+        let fruits = [
+            Fruit::Apple,
+            Fruit::Orange,
+            Fruit::Strawberry,
+            Fruit::Tomato,
+        ];
         Column::new()
+            .push(
+                pick_list(fruits, self.selected_option, Message::FruitSelected)
+                    .placeholder("Select your favorite fruit..."),
+            )
             .push(button("+").on_press(Message::Increment))
             .push(text(self.value).size(50))
             .push(button("-").on_press(Message::Decrement))
-            .push(Container::new(canvas).width(Length::Fill).height(Length::from(500))) // 캔버스 높이 지정
+            .push(
+                Container::new(canvas)
+                    .width(Length::Fill)
+                    .center(800)
+                    .height(Length::from(500))
+                    .padding(20) // 패딩 추가
+                    .style(container::rounded_box), // 사용자 정의 스타일 적용
+            ) // 캔버스 높이 지정
             .into()
     }
 
@@ -68,6 +102,9 @@ impl Counter {
                     high: new_value as f32 + 1.0,
                     low: new_value as f32 - 1.0,
                 });
+            }
+            Message::FruitSelected(fruit) => {
+                self.selected_option = Some(fruit);
             }
         }
     }
@@ -112,9 +149,9 @@ impl<Message> Program<Message> for Chart {
 
             // 몸체 그리기
             frame.fill_rectangle(
-                iced::Point::new(x, body_top),
-                iced::Size::new(15.0, body_bottom - body_top),
-                body_color,
+                iced::Point::new(150., 150.),
+                iced::Size::new(15.0, 100.),
+                Color::from_rgb(0.0, 255.0, 0.0),
             );
 
             // 고가와 저가 선 그리기
