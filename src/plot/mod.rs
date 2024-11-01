@@ -17,8 +17,8 @@ use iced::{
     },
     Color, Element, Length, Point, Rectangle, Size, Subscription,
 };
+use std::thread::sleep;
 use std::time::{Duration, Instant};
-
 pub struct Chart {
     candlesticks: Vec<Candlestick>,
     state: ChartState,
@@ -28,16 +28,13 @@ impl Chart {
     pub fn new(candlesticks: Vec<Candlestick>) -> Self {
         Self {
             candlesticks,
-            state: ChartState {
-                auto_scroll: true,
-                scroll_offset: 0.0,
-                ..ChartState::default()
-            },
+            state: ChartState::default(), // ChartState를 새로운 인스턴스로 초기화
+
         }
     }
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct ChartState {
     offset: f32,
     dragging: bool,
@@ -45,11 +42,26 @@ pub struct ChartState {
     last_offset: f32,
     auto_scroll: bool,
     scroll_offset: f32,
-    //  last_time: Instant, // 추가된 필드
+    last_time: Instant, // 추가된 필드
+}
+
+// Default trait의 수동 구현
+impl Default for ChartState {
+    fn default() -> Self {
+        Self {
+            offset: 0.0,
+            dragging: false,
+            drag_start: Point::new(0.0, 0.0),
+            last_offset: 0.0,
+            auto_scroll: false,
+            scroll_offset: 0.0,
+            last_time: Instant::now(), // 현재 시간을 설정
+        }
+    }
 }
 impl<Message> Program<Message> for Chart {
     type State = ChartState;
-
+ 
     fn update(
         &self,
         state: &mut Self::State,
@@ -139,7 +151,6 @@ impl<Message> Program<Message> for Chart {
         } else {
             20.0 + state.offset
         };
-
         for (i, candlestick) in self.candlesticks.iter().enumerate() {
             let x = start_x + (i as f32 * fixed_candle_width);
 
@@ -176,6 +187,11 @@ impl<Message> Program<Message> for Chart {
                 Size::new(body_width, body_height),
                 color,
             );
+            loop {
+                println!("1");
+                sleep(Duration::from_secs(3));
+                return vec![frame.into_geometry()];
+            }
         }
 
         vec![frame.into_geometry()]

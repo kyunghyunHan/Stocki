@@ -45,6 +45,7 @@ struct Stocki {
 }
 
 impl Stocki {
+    //사용 안하는듯
     pub fn new() -> Self {
         Self {
             candlesticks: vec![Candlestick {
